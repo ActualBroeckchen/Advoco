@@ -82,17 +82,13 @@ privacy settings.
   directly; every write goes through Proto-Familiar's API, so its
   snapshotting, consent gates, and memory pipeline do the real work.
 
-## Known upstream issue (Proto-Familiar)
+## Reliability notes
 
-Proto-Familiar's `POST /api/entity/identity` with `mode: "update_section"`
-silently fails: thalamus sends the MCP tool a parameter named `heading`,
-but Phylactery's tool requires `section`, and the validation error comes
-back as an `isError` response thalamus never checks — the HTTP API still
-answers `{ok: true}` while nothing is written (verified against
-0.10.98-alpha, 2026-08-15). Advoco therefore writes identity files with
-`mode: "append"` (headings embedded in the content) and skips files that
-already exist, so re-runs never duplicate. Once fixed upstream,
-`update_section` becomes the better mode again.
+Advoco never trusts a success response alone: every identity write is
+verified by re-reading the store, and anything that didn't land falls back
+transparently to a compatibility path — so a Familiar arrives complete even
+on older Proto-Familiar builds. Re-runs skip files that already exist, so an
+existing Familiar's identity is never clobbered.
 
 ## For developers: building from source
 

@@ -80,6 +80,7 @@ struct Payload<'a> {
 struct PayloadIdentity<'a> {
     category: &'a str,
     filename: &'a str,
+    heading: &'a str,
     content: String,
 }
 
@@ -109,6 +110,7 @@ fn build_payload<'a>(bp: &'a FamiliarBlueprint, settings: &crate::blueprint::Set
             .map(|w| PayloadIdentity {
                 category: w.category,
                 filename: w.filename,
+                heading: w.heading,
                 content: w.content,
             })
             .collect(),
@@ -122,7 +124,9 @@ fn build_payload<'a>(bp: &'a FamiliarBlueprint, settings: &crate::blueprint::Set
 }
 
 fn apply_ps1() -> &'static str {
-    r#"# Advoco bootstrap applier - run by Advoco-Bootstrap.vbs (hidden window).
+    // r###-delimited: the script contains `"#` and `"##` sequences (e.g.
+    // "## heading) that would end shorter raw strings early.
+    r###"# Advoco bootstrap applier - run by Advoco-Bootstrap.vbs (hidden window).
 # Applies payload.json to a running Proto-Familiar instance. No console output
 # by design; the result is shown as a native MessageBox popup.
 # (-Silent is a testing affordance: popups become console output.)
@@ -155,10 +159,13 @@ try {
     # 1. Safety snapshot.
     $null = Post '/api/entity/snapshots' @{}
 
-    # 2. Identity files - append mode, skipping ones that already exist
-    #    (update_section is broken upstream: param name mismatch between
-    #    thalamus and Phylactery fails silently with ok:true).
+    # 2. Identity files. update_section is the intended mode (fixed upstream
+    #    2026-08-16), but older Proto-Familiar builds swallowed it with a
+    #    silent ok:true - so each write is VERIFIED by re-reading the store,
+    #    with an append fallback for anything that did not land. Files that
+    #    already exist are left untouched (never clobber a live Familiar).
     $existing = Invoke-RestMethod -Uri "$base/api/entity/identity" -Method Get
+    $todo = @()
     foreach ($w in $p.identity) {
         $already = $false
         foreach ($cat in 'self','ward','relationship','custom') {
@@ -170,9 +177,30 @@ try {
         try {
             $null = Post '/api/entity/identity' @{
                 category = $w.category; filename = $w.filename
-                content  = $w.content;  mode     = 'append'
+                heading  = $w.heading;  content  = $w.content
+                mode     = 'update_section'
             }
+            $todo += $w
         } catch { $failed += $w.filename }
+    }
+    if ($todo.Count -gt 0) {
+        $after = Invoke-RestMethod -Uri "$base/api/entity/identity" -Method Get
+        foreach ($w in $todo) {
+            $landed = $false
+            foreach ($cat in 'self','ward','relationship','custom') {
+                foreach ($f in $after.$cat) {
+                    if ($f.filename -eq $w.filename -and $cat -eq $w.category) { $landed = $true }
+                }
+            }
+            if ($landed) { continue }
+            try {
+                $null = Post '/api/entity/identity' @{
+                    category = $w.category; filename = $w.filename
+                    content  = "## $($w.heading)`n`n$($w.content)`n"
+                    mode     = 'append'
+                }
+            } catch { $failed += $w.filename }
+        }
     }
 
     # 3. Settings patch (PF merges it with existing settings).
@@ -197,7 +225,7 @@ try {
     Show 'Advoco bootstrap', "Something went wrong before anything was written:`n$($_.Exception.Message)"
     exit 1
 }
-"#
+"###
 }
 
 fn bootstrap_vbs() -> &'static str {
