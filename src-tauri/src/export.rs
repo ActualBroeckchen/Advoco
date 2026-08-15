@@ -11,7 +11,7 @@
 //! and the PowerShell script shows a native MessageBox when it finishes.
 
 use crate::blueprint::FamiliarBlueprint;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub fn write_bootstrap_package(
     dir: &Path,
@@ -35,7 +35,35 @@ pub fn write_bootstrap_package(
     Ok(pkg_dir)
 }
 
-use std::path::PathBuf;
+/// Zip a package folder for sharing (ready-made Familiars). Uses
+/// PowerShell's Compress-Archive — no extra Rust dependency. Returns the
+/// zip path.
+pub fn zip_package(pkg_dir: &Path, familiar_name: &str) -> Result<PathBuf, String> {
+    let safe: String = familiar_name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '_' })
+        .collect();
+    let zip_path = pkg_dir
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(format!("Advoco-Familiar-{safe}.zip"));
+    let status = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "Compress-Archive -Path '{}' -DestinationPath '{}' -Force",
+                pkg_dir.display(),
+                zip_path.display()
+            ),
+        ])
+        .status()
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err("could not create the zip archive".into());
+    }
+    Ok(zip_path)
+}
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
