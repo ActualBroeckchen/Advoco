@@ -309,7 +309,15 @@ function screenReview() {
 
   // Edits write back into the blueprint's plain fields.
   bindField("identity", (v) => { bp.backstory = firstLine(v) || bp.backstory; bp.concept = restLines(v) || bp.concept; });
-  bindField("voice", (v) => { bp.voice = bp.voice || {}; bp.voice.description = v; });
+  bindField("voice", (v) => {
+    bp.voice = bp.voice || {};
+    const lines = v.split("\n").map(l => l.trim()).filter(Boolean);
+    bp.voice.register = lines[0] || bp.voice.register || "";
+    const quoted = lines.filter(l => l.startsWith('"') || l.startsWith('“'));
+    if (quoted.length) bp.voice.styleReferences = quoted;
+    const rest = lines.filter(l => !quoted.includes(l) && l !== lines[0]);
+    if (rest.length) bp.voice.description = rest.join("\n");
+  });
   bindField("care", (v) => { bp.warmthExpression = bulletList(v); });
   bindField("userfacts", (v) => { bp.userFacts = bulletList(v); });
 
@@ -324,7 +332,9 @@ function reviewIdentity(bp) {
 }
 function reviewVoice(bp) {
   const v = bp.voice || {};
-  return [v.description, v.dialect, v.accent, (v.tics || []).join("; "),
+  return [v.register, v.description, v.dialect, v.accent,
+          (v.tics || []).join("; "),
+          (v.styleReferences || []).join("\n"),
           (v.signaturePhrases || []).join("; ")].filter(Boolean).join("\n");
 }
 function reviewCare(bp) {
@@ -374,6 +384,12 @@ function screenApply() {
         No Proto-Familiar right now?
         <button class="linky" id="export">Save a "bring them to life" folder</button> —
         double-click it any time after you start Proto-Familiar.
+      </p>
+
+      <p class="hint">
+        Made a Familiar worth sharing?
+        <button class="linky" id="exportzip">Save a shareable package (.zip)</button> —
+        anyone can unzip it and double-click; they never need Advoco.
       </p>
 
       <div class="row" style="justify-content:center">
@@ -426,6 +442,23 @@ function screenApply() {
           <p class="hint">${escapeHtml(dir)}<br/>
           Open Proto-Familiar, then double-click
           <b>Advoco-Bootstrap.vbs</b> inside that folder. That's all.</p>
+        </div>`));
+    } catch (e) { screenError(e, screenApply); }
+  });
+
+  document.getElementById("exportzip").addEventListener("click", async () => {
+    try {
+      const zip = await invoke("export_bootstrap", {
+        args: { blueprint: S.blueprint, userName: null, pfPort: S.pfPort, asZip: true },
+        llm: S.llm,
+      });
+      screen().querySelector(".screen-inner").prepend(el(`
+        <div class="review-card" style="border-color:var(--good)">
+          <h3>🎁 Shareable package saved</h3>
+          <p class="hint">${escapeHtml(zip)}<br/>
+          Send this zip to anyone: unzip, start Proto-Familiar,
+          double-click <b>Advoco-Bootstrap.vbs</b>. They never need Advoco.
+          (It carries no API keys and nothing about you.)</p>
         </div>`));
     } catch (e) { screenError(e, screenApply); }
   });

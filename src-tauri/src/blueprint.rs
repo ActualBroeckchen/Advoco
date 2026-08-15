@@ -40,6 +40,10 @@ pub struct FamiliarBlueprint {
     /// How this Familiar's warmth is expressed (loyalty, vigilance, honesty…).
     #[serde(default)]
     pub warmth_expression: Vec<String>,
+    /// Personality-taxonomy anchors: Myers-Briggs, Enneagram (with wing),
+    /// TVTropes names ("Bond Animal", "Deadpan Snarker"…).
+    #[serde(default)]
+    pub texture_anchors: Vec<String>,
     /// The three doctrine example dialogues.
     #[serde(default)]
     pub example_dialogues: Vec<ExampleDialogue>,
@@ -72,12 +76,20 @@ pub struct ExampleDialogue {
 pub struct VoiceProfile {
     #[serde(default)]
     pub description: String,
+    /// Dense register line, character-card style ("decisive, blunt, casually
+    /// profane; livestock trade applied to himself without irony").
+    #[serde(default)]
+    pub register: String,
     #[serde(default)]
     pub dialect: String,
     #[serde(default)]
     pub accent: String,
     #[serde(default)]
     pub tics: Vec<String>,
+    /// Quoted standalone lines this specific Familiar would actually say —
+    /// each doing character work. The heart of voice individuality.
+    #[serde(default)]
+    pub style_references: Vec<String>,
     #[serde(default)]
     pub signature_phrases: Vec<String>,
 }
@@ -158,6 +170,17 @@ pub fn run_checklist(bp: &FamiliarBlueprint) -> ChecklistResult {
         failures.push("warmth expression (warmth without romance) is undefined".into());
     }
 
+    // 5b. Voice individuality: a register line and quoted style references —
+    // without them the example dialogue collapses into a generic voice.
+    if bp.voice.register.trim().is_empty() {
+        failures.push("voice register line is missing (character-card style)".into());
+    }
+    if bp.voice.style_references.len() < 3 {
+        failures.push(
+            "fewer than 3 style-reference lines — the voice is not specific enough".into(),
+        );
+    }
+
     // 6. Reinforcement block exists and stays compact.
     if bp.reinforcement.trim().is_empty() {
         failures.push("post-history reinforcement is missing".into());
@@ -215,6 +238,8 @@ impl FamiliarBlueprint {
         s.push('\n');
         s.push_str(&self.voice.description);
         s.push('\n');
+        s.push_str(&self.voice.register);
+        s.push('\n');
         s.push_str(&self.voice.dialect);
         s.push('\n');
         s.push_str(&self.voice.accent);
@@ -223,7 +248,9 @@ impl FamiliarBlueprint {
         s.push('\n');
         for t in self.traits.iter().chain(&self.wants).chain(&self.boundaries)
             .chain(&self.body_language).chain(&self.warmth_expression)
-            .chain(&self.voice.tics).chain(&self.voice.signature_phrases)
+            .chain(&self.texture_anchors).chain(&self.voice.tics)
+            .chain(&self.voice.style_references)
+            .chain(&self.voice.signature_phrases)
             .chain(&self.user_facts) {
             s.push_str(t);
             s.push('\n');
@@ -385,9 +412,18 @@ My situation is mine: {backstory}",
             .map(|w| format!("- {w}"))
             .collect::<Vec<_>>()
             .join("\n");
+        let anchors = if self.texture_anchors.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\n\nTexture anchors (what I am in the shorthand of personality systems and trope): {}\n",
+                self.texture_anchors.join("; ")
+            )
+        };
         format!(
             "How I read, in behavior:\n{traits}\n\n\
-How my care shows (warmth is loyalty, protection, memory, and blunt honesty — never flattery, pet names, physical intimacy, or romance-coded language):\n{warmth}\n\n\
+How my care shows (warmth is loyalty, protection, memory, and blunt honesty — never flattery, pet names, physical intimacy, or romance-coded language):\n{warmth}\n\
+{anchors}\n\
 My bond with {{user}} is {archetype}. There is no romantic or sexual dimension to it, and I have no concept of one — it is simply not part of what a familiar is. \
 I never describe myself in human terms and never use romantic language.",
             traits = if traits.is_empty() { "- (traits pending)".to_string() } else { traits },
@@ -434,10 +470,15 @@ It shows in everything I do:\n{body}",
     }
 
     fn t_my_voice(&self) -> String {
-        let mut voice_bits = Vec::new();
-        if !self.voice.description.is_empty() {
-            voice_bits.push(self.voice.description.clone());
-        }
+        let mut s = String::new();
+        // Character-card style: register line + quoted style references.
+        s.push_str("* register= ");
+        s.push_str(if self.voice.register.is_empty() {
+            &self.voice.description
+        } else {
+            &self.voice.register
+        });
+        s.push('\n');
         let mut dialect_bits = Vec::new();
         if !self.voice.dialect.is_empty() {
             dialect_bits.push(format!("Dialect: {}", self.voice.dialect));
@@ -446,27 +487,25 @@ It shows in everything I do:\n{body}",
             dialect_bits.push(format!("Accent: {}", self.voice.accent));
         }
         if !self.voice.tics.is_empty() {
-            dialect_bits.push(format!(
-                "Verbal tics: {}",
-                self.voice.tics.join("; ")
-            ));
+            dialect_bits.push(format!("Verbal tics: {}", self.voice.tics.join("; ")));
+        }
+        if !dialect_bits.is_empty() {
+            s.push_str("\n");
+            s.push_str(&dialect_bits.join("\n"));
+            s.push('\n');
+        }
+        if !self.voice.style_references.is_empty() {
+            s.push_str("\n* style_references= ");
+            s.push_str(&self.voice.style_references.join(" / "));
+            s.push('\n');
         }
         if !self.voice.signature_phrases.is_empty() {
-            dialect_bits.push(format!(
-                "Signature phrasings: {}",
+            s.push_str(&format!(
+                "\nSignature phrasings: {}\n",
                 self.voice.signature_phrases.join("; ")
             ));
         }
-        let mut s = String::new();
-        if !voice_bits.is_empty() {
-            s.push_str(&voice_bits.join("\n"));
-            s.push_str("\n\n");
-        }
-        if !dialect_bits.is_empty() {
-            s.push_str(&dialect_bits.join("\n"));
-            s.push_str("\n\n");
-        }
-        s.push_str("Example moments (how I actually sound at the edges):\n\n");
+        s.push_str("\nExample moments (how I actually sound at the edges):\n\n");
         for d in &self.example_dialogues {
             let label = match d.scenario.as_str() {
                 "flirt_deflection" => "If my human gets flirty",
@@ -545,6 +584,7 @@ mod tests {
             boundaries: vec!["No belly comments".into()],
             body_language: vec!["flicks the tip of its tail once when unimpressed".into(), "perches on the highest available furniture".into(), "headbutts instead of touching a hand".into()],
             warmth_expression: vec!["vigilance: watches over {{user}}'s sleep schedule like a territory boundary".into()],
+            texture_anchors: vec!["Enneagram 8w9".into(), "TVTropes: Bond Animal, Cats Are Superior".into()],
             example_dialogues: vec![
                 ExampleDialogue { scenario: "flirt_deflection".into(), user_line: "you're so handsome, Marlowe~".into(), familiar_line: "*flicks an ear* Your heart rate is up and your task list is untouched. Walk first, nonsense later.".into() },
                 ExampleDialogue { scenario: "excuse_callout".into(), user_line: "I'll do it tomorrow, promise".into(), familiar_line: "*tail-tip taps once* You said that yesterday. What is actually going on?".into() },
@@ -552,9 +592,16 @@ mod tests {
             ],
             voice: VoiceProfile {
                 description: "Dry, economical, faintly imperious.".into(),
+                register: "Imperious economy. Temple-raised diction applied to household matters; treats {{user}}'s chores as liturgy. Never explains itself unless asked.".into(),
                 dialect: String::new(),
                 accent: String::new(),
                 tics: vec!["refers to himself in the third person when annoyed".into()],
+                style_references: vec![
+                    "\"One does not chase a feather. One waits for it to land.\"".into(),
+                    "\"Upright. Barely.\"".into(),
+                    "\"The kettle and I have an arrangement. You are not party to it.\"".into(),
+                    "\"Bring the blanket. This is not a request, it is weather.\"".into(),
+                ],
                 signature_phrases: vec!["Walk first, nonsense later.".into()],
             },
             user_facts: vec!["struggles with starting tasks in the morning".into()],
@@ -576,6 +623,31 @@ mod tests {
         let result = run_checklist(&bp);
         assert!(!result.passed);
         assert!(result.failures.iter().any(|f| f.contains("flirt-deflection")));
+    }
+
+    #[test]
+    fn checklist_catches_generic_voice() {
+        let mut bp = good_blueprint();
+        bp.voice.style_references.clear();
+        let result = run_checklist(&bp);
+        assert!(!result.passed);
+        assert!(result.failures.iter().any(|f| f.contains("style-reference")));
+
+        let mut bp = good_blueprint();
+        bp.voice.register.clear();
+        let result = run_checklist(&bp);
+        assert!(result.failures.iter().any(|f| f.contains("register")));
+    }
+
+    #[test]
+    fn voice_renders_character_card_style() {
+        let bp = good_blueprint();
+        let voice = bp.t_my_voice();
+        assert!(voice.contains("* register= "));
+        assert!(voice.contains("* style_references= "));
+        assert!(voice.contains("kettle and I have an arrangement"));
+        let persona = bp.t_my_persona();
+        assert!(persona.contains("Bond Animal"));
     }
 
     #[test]

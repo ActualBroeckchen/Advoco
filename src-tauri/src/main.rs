@@ -187,6 +187,10 @@ struct ExportArgs {
     blueprint: FamiliarBlueprint,
     user_name: Option<String>,
     pf_port: u16,
+    /// When true, additionally produce a shareable zip (ready-made Familiar)
+    /// next to the package folder.
+    #[serde(default)]
+    as_zip: bool,
 }
 
 #[tauri::command]
@@ -205,6 +209,19 @@ async fn export_bootstrap(
     let settings = args.blueprint.render_settings(args.user_name);
     // Default save location: the user's Desktop — zero-navigation.
     let desktop = dirs_desktop(&app)?;
+    if args.as_zip {
+        // A shareable Familiar carries the Familiar — never the creator's
+        // personal data. Strip everything distilled from the creator's own
+        // chatlogs before packaging.
+        let mut public_bp = args.blueprint.clone();
+        public_bp.user_facts.clear();
+        public_bp.graph_entities.clear();
+        let public_settings = public_bp.render_settings(None);
+        let pkg =
+            export::write_bootstrap_package(&desktop, &public_bp, &public_settings, args.pf_port)?;
+        let zip = export::zip_package(&pkg, &public_bp.name)?;
+        return Ok(zip.to_string_lossy().into_owned());
+    }
     let pkg = export::write_bootstrap_package(&desktop, &args.blueprint, &settings, args.pf_port)?;
     Ok(pkg.to_string_lossy().into_owned())
 }

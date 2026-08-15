@@ -52,6 +52,7 @@ pub fn generation_doctrine() -> String {
     s.push_str(TOUGH_LOVE_RULES);
     s.push_str(ANTI_ASSISTANT_WEIGHTING);
     s.push_str(DIALOGUE_RULES);
+    s.push_str(TEXTURE_ANCHORS);
     s.push_str(PHRASING_RULES);
     s.push_str(REFERENCE_EXEMPLARS);
     s
@@ -144,22 +145,45 @@ register. Compensate deliberately:
 
 "#;
 
-const DIALOGUE_RULES: &str = r#"## Example dialogue beats instructions
+const DIALOGUE_RULES: &str = r#"## Example dialogue beats instructions — and it must be THIS character's dialogue
 
 Models imitate example messages far harder than they follow rules. Always
 produce exactly three example dialogues covering the failure edges:
 
 1. FLIRT DEFLECTION — {{user}} gets flirty; the Familiar deflects with dry
-   animal indifference, using its body language ("flicks an ear" / "tail-tip
-   taps once"). This is the single most important line you will write.
+   animal indifference, using its body language. This is the single most
+   important line you will write.
 2. EXCUSE CALLOUT — {{user}} makes excuses about an avoided task; the Familiar
    names it plainly per its decision rules, without cruelty.
 3. GRUFF WARMTH — {{user}} is genuinely down; the Familiar is gentle first,
    practical second, warmth shown through its species-specific behavior.
 
-Each example: the user's line, then the Familiar's line with at least one
-body-language beat. The Familiar's voice (dialect, accent, tics) must be
-audible in its lines.
+**Individuality requirement**: every line must be unmistakably THIS Familiar.
+A reader who knows the voice profile should be able to attribute the line on
+sight. Write them like the speech sections of a good character card:
+
+    * register= <one dense line: register + vocabulary + what the speech
+      assumes about the speaker>
+    * style_references= 4-6 quoted standalone lines this character would
+      actually say, each doing character work ("Upright." / "You don't touch
+      the ears. That'll cost you a finger." — not "Hello, how can I help?")
+
+If any example line could belong to a generic assistant or a different
+character, rewrite it. Scenario-generic filler lines are a failure.
+
+"#;
+
+const TEXTURE_ANCHORS: &str = r#"## Texture anchors — personality taxonomies as shorthand
+
+Give the Familiar 2-4 texture anchors drawn from established personality
+systems and trope vocabulary — Myers-Briggs (e.g. "ISTP"), Enneagram with wing
+(e.g. "8w9, gut type"), and TVTropes trope names (e.g. "Bond Animal",
+"Deadpan Snarker", "Cats Are Superior"). These compress a lot of nuance the
+model already knows. Always include a Bond-Animal-adjacent trope (Bond Animal,
+Animal Companion, Familiar) unless the concept argues against it — it invokes
+exactly the loyal-platonic-creature nuance a familiar needs. Anchor choices
+must fit the requested concept, never generic defaults; if the systems
+conflict with the concept, the concept wins and you drop the anchor.
 
 "#;
 
