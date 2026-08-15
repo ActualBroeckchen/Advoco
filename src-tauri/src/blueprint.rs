@@ -276,22 +276,21 @@ impl FamiliarBlueprint {
 // ---------------------------------------------------------------------------
 
 /// One identity file to write into Phylactery via
-/// `POST /api/entity/identity`. Content is prefixed with its `## heading`.
+/// `POST /api/entity/identity` (mode `update_section`: replaces the body of
+/// `## {heading}`, creating the file if absent).
 ///
-/// Uses mode `append` (create-or-append), NOT `update_section`: Phylactery's
-/// MCP tool names the parameter `section` while thalamus sends `heading`,
-/// so every `update_section` call fails validation and — because thalamus
-/// does not check FastMCP's `isError` — fails SILENTLY with `{ok:true}`
-/// (verified against Proto-Familiar 0.10.98-alpha, 2026-08-15). Append takes
-/// only `{category, filename, content}`, which round-trips correctly, and on
-/// a fresh install the files don't exist yet anyway. apply.rs skips files
-/// that already exist so re-runs never duplicate.
+/// The upstream heading↔section mismatch (thalamus sent `heading`, the tool
+/// wanted `section`, and the error was swallowed) was fixed in
+/// Proto-Familiar on 2026-08-16 — thalamus now maps the names and checks
+/// `isError`. Advoco still verifies every write landed and falls back to
+/// append mode on older builds (see apply.rs); never trust `{ok:true}`.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentityWrite {
     /// "self" | "ward" | "relationship" | "custom"
     pub category: &'static str,
     pub filename: &'static str,
+    pub heading: &'static str,
     pub content: String,
 }
 
@@ -310,11 +309,12 @@ impl FamiliarBlueprint {
     /// Render the blueprint into the full set of identity-file writes.
     /// Pure function of the blueprint — no LLM, no network.
     pub fn render_identity_writes(&self) -> Vec<IdentityWrite> {
-        let w = |category: &'static str, filename: &'static str, heading: &str, content: String| {
+        let w = |category: &'static str, filename: &'static str, heading: &'static str, content: String| {
             IdentityWrite {
                 category,
                 filename,
-                content: format!("## {heading}\n\n{content}\n"),
+                heading,
+                content,
             }
         };
         vec![

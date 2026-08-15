@@ -144,16 +144,19 @@ impl PfClient {
             }
         }
 
-        // 2. Identity files — append mode (see blueprint::IdentityWrite docs
-        // for why update_section is unusable upstream), skipping files that
-        // already exist so re-running the wizard never duplicates content.
+        // 2. Identity files. Primary: mode update_section (the intended
+        // wiring, fixed upstream 2026-08-16). Because the pre-fix failure
+        // mode was a SILENT ok:true, every write is verified by re-reading
+        // the store; anything that didn't land falls back to append mode
+        // (which works on all builds) with the heading embedded. Files that
+        // already exist are left untouched so re-runs never clobber an
+        // existing Familiar's identity.
         let existing = self.existing_identity_files().await;
-        for w in bp.render_identity_writes() {
+        let writes = bp.render_identity_writes();
+        let mut pending: Vec<&crate::blueprint::IdentityWrite> = Vec::new();
+        for w in &writes {
             let step = format!("identity/{}/{}", w.category, w.filename);
-            if existing
-                .iter()
-                .any(|(c, f)| c == w.category && f == w.filename)
-            {
+            if existing.iter().any(|(c, f)| c == w.category && f == w.filename) {
                 steps.push(StepResult {
                     step,
                     ok: true,
@@ -164,15 +167,12 @@ impl PfClient {
             let body = json!({
                 "category": w.category,
                 "filename": w.filename,
+                "heading":  w.heading,
                 "content":  w.content,
-                "mode":     "append",
+                "mode":     "update_section",
             });
             match self.post_json("/api/entity/identity", body).await {
-                Ok(resp) if resp.status().is_success() => steps.push(StepResult {
-                    step,
-                    ok: true,
-                    detail: "written".into(),
-                }),
+                Ok(resp) if resp.status().is_success() => pending.push(w),
                 Ok(resp) => {
                     let status = resp.status();
                     let err = resp.text().await.unwrap_or_default();
@@ -187,6 +187,51 @@ impl PfClient {
                     ok: false,
                     detail: e.to_string(),
                 }),
+            }
+        }
+
+        // 2b. Verify the writes landed; append-fallback for anything that
+        // didn't (pre-fix Proto-Familiar builds swallow update_section).
+        if !pending.is_empty() {
+            let after = self.existing_identity_files().await;
+            for w in pending {
+                let step = format!("identity/{}/{}", w.category, w.filename);
+                let landed = after.iter().any(|(c, f)| c == w.category && f == w.filename);
+                if landed {
+                    steps.push(StepResult {
+                        step,
+                        ok: true,
+                        detail: "written".into(),
+                    });
+                    continue;
+                }
+                let fallback = json!({
+                    "category": w.category,
+                    "filename": w.filename,
+                    "content":  format!("## {}\n\n{}\n", w.heading, w.content),
+                    "mode":     "append",
+                });
+                match self.post_json("/api/entity/identity", fallback).await {
+                    Ok(resp) if resp.status().is_success() => steps.push(StepResult {
+                        step,
+                        ok: true,
+                        detail: "written (compatibility mode — consider updating Proto-Familiar)".into(),
+                    }),
+                    Ok(resp) => {
+                        let status = resp.status();
+                        let err = resp.text().await.unwrap_or_default();
+                        steps.push(StepResult {
+                            step,
+                            ok: false,
+                            detail: format!("write did not land and fallback failed ({status}): {err}"),
+                        });
+                    }
+                    Err(e) => steps.push(StepResult {
+                        step,
+                        ok: false,
+                        detail: e.to_string(),
+                    }),
+                }
             }
         }
 
