@@ -1,0 +1,11 @@
+# Rust / Tauri
+src-tauri/target/
+src-tauri/Cargo.lock.orig
+
+# local scratch
+*.log
+.DS_Store
+Thumbs.db
+
+# mimosa plugin session state
+.mimosa/
