@@ -386,13 +386,22 @@ const SCHEMA_HINT: &str = r#"{
   boundaries: string[],
   bodyLanguage: string[],          // 4-7 species-specific behaviors
   warmthExpression: string[],      // warmth without romance, concrete
-  exampleDialogues: [              // exactly 3, in this order
+  textureAnchors: string[],        // 2-4 anchors: Myers-Briggs, Enneagram wing,
+                                   //   TVTropes names — always include a
+                                   //   Bond-Animal-adjacent trope if it fits
+  exampleDialogues: [              // exactly 3, in this order, each written in
+                                    // THIS character's unmistakable voice
     { scenario: "flirt_deflection", userLine: string, familiarLine: string },
     { scenario: "excuse_callout", userLine: string, familiarLine: string },
     { scenario: "gruff_warmth", userLine: string, familiarLine: string }
   ],
-  voice: { description: string, dialect: string, accent: string,
-           tics: string[], signaturePhrases: string[] },
+  voice: { description: string,
+           register: string,       // one dense character-card register line
+           dialect: string, accent: string,
+           tics: string[], signaturePhrases: string[],
+           styleReferences: string[] }, // 4-6 quoted lines this Familiar
+                                        //   would actually say, each doing
+                                        //   character work
   userFacts: string[],             // about the ward, only from excerpts; empty if none
   graphEntities: [ { label: string, type: "person"|"pet"|"project"|"place"|"organisation"|"thing",
                      relation: string, description: string } ],
