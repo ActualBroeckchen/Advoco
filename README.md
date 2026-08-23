@@ -35,10 +35,22 @@ ever appears.
 ## Sharing ready-made Familiars
 
 On the last screen, **Save a shareable package (.zip)** turns your sketch into
-something anyone can use: they unzip, start Proto-Familiar, and double-click
-`Advoco-Bootstrap.vbs`. The receiver never needs Advoco, an LLM key, or a
-terminal — the package carries everything and writes into their Phylactery
-through Proto-Familiar's own API.
+something anyone can use, on **any major OS**: they unzip, start Proto-Familiar,
+and double-click the launcher for their system —
+
+- **Windows:** `Advoco-Bootstrap.vbs` (runs with no console window)
+- **macOS:** `Advoco-Bootstrap.app` (runs with no Terminal window)
+- **Linux:** `Advoco-Bootstrap.desktop` (runs with `Terminal=false`)
+
+The receiver never needs Advoco, an LLM key, or a terminal — the package carries
+everything and writes into their Phylactery through Proto-Familiar's own API.
+Each launcher just hands off to a small worker (`apply.ps1` on Windows,
+`apply.sh` on macOS/Linux) that reports its result in a native dialog.
+
+On macOS the shared `.app` is unsigned, so the first launch may need a
+right-click → **Open** (Gatekeeper). On Linux some file managers ask you to
+mark the `.desktop` file as trusted first; if double-click does nothing, run
+`sh apply.sh` from the unzipped folder instead.
 
 Packages are private by design: anything distilled from *your* conversations
 (facts about you, the people and pets in your chats) is stripped before the
@@ -103,9 +115,13 @@ cargo build          # debug binary at target/debug/advoco.exe
 
 The UI is plain HTML/CSS/JS in `ui/` with no build step — but note the
 assets are embedded at compile time, so rebuild (touch `build.rs`) after
-editing them. The generated `.ps1`/`.vbs` scripts must stay pure ASCII:
-PowerShell 5.1 reads BOM-less files as ANSI, and UTF-8 punctuation can
-decode into string terminators.
+editing them. The generated launcher scripts (`.ps1`, `.vbs`, `apply.sh`,
+the macOS applet, the `.desktop`) must stay pure ASCII: PowerShell 5.1 reads
+BOM-less files as ANSI, and UTF-8 punctuation can decode into string
+terminators. All non-ASCII personality text lives in the UTF-8 JSON data
+files under `requests/` instead, which the workers POST verbatim — so the
+scripts themselves never carry it. (`export.rs` has a test that fails if any
+generated script picks up a non-ASCII byte.)
 
 ## License
 

@@ -440,8 +440,10 @@ function screenApply() {
         <div class="review-card" style="border-color:var(--good)">
           <h3>📁 Saved to your Desktop</h3>
           <p class="hint">${escapeHtml(dir)}<br/>
-          Open Proto-Familiar, then double-click
-          <b>Advoco-Bootstrap.vbs</b> inside that folder. That's all.</p>
+          Open Proto-Familiar, then double-click the launcher for your system
+          inside that folder — <b>Advoco-Bootstrap.vbs</b> on Windows,
+          <b>Advoco-Bootstrap.app</b> on macOS, or
+          <b>Advoco-Bootstrap.desktop</b> on Linux. That's all.</p>
         </div>`));
     } catch (e) { screenError(e, screenApply); }
   });
@@ -456,8 +458,11 @@ function screenApply() {
         <div class="review-card" style="border-color:var(--good)">
           <h3>🎁 Shareable package saved</h3>
           <p class="hint">${escapeHtml(zip)}<br/>
-          Send this zip to anyone: unzip, start Proto-Familiar,
-          double-click <b>Advoco-Bootstrap.vbs</b>. They never need Advoco.
+          Send this zip to anyone on any system: they unzip, start
+          Proto-Familiar, and double-click the launcher for their OS —
+          <b>Advoco-Bootstrap.vbs</b> (Windows),
+          <b>Advoco-Bootstrap.app</b> (macOS), or
+          <b>Advoco-Bootstrap.desktop</b> (Linux). They never need Advoco.
           (It carries no API keys and nothing about you.)</p>
         </div>`));
     } catch (e) { screenError(e, screenApply); }
