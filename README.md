@@ -8,8 +8,8 @@ you ever say hello.
 ## Using Advoco
 
 You don't build anything. Grab the Windows installer
-(`Advoco_x64-setup.exe`) from the repository's Releases page, run it, and
-start Advoco from your Start menu. That's it.
+(`Advoco_<version>_x64-setup.exe`) from the repository's Releases page, run
+it, and start Advoco from your Start menu. That's it.
 
 1. **Who is joining you?** Describe your Familiar in your own words — one
    sentence is plenty ("a haughty cat"). A name is optional; so are
