@@ -1,6 +1,6 @@
 [package]
 name = "advoco"
-version = "0.1.0"
+version = "0.2.0"
 description = "Onboarding wizard that gives new Proto-Familiar Familiars a vivid, stable personality"
 license = "GPL-3.0-only"
 repository = "https://github.com/ActualBroeckchen/Advoco"

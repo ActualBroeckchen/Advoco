@@ -1,0 +1,44 @@
+name: Release
+
+# Build the Windows installer and publish it to a GitHub Release whenever a
+# version tag (e.g. v0.2.0) is pushed. Advoco is a Tauri app whose only bundle
+# target is the NSIS installer, so the build must run on Windows.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write # tauri-action needs this to create the release and upload assets
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (stable)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # The UI is plain HTML/CSS/JS embedded at compile time (no JS build step),
+      # so there is nothing to install or build before Tauri runs.
+      - name: Build installer and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Advoco ${{ github.ref_name }}"
+          releaseBody: |
+            Windows installer for Advoco ${{ github.ref_name }}.
+
+            Grab `Advoco_*_x64-setup.exe` below, run it, and start Advoco from
+            your Start menu. See the README for what's new.
+          releaseDraft: false
+          prerelease: false
