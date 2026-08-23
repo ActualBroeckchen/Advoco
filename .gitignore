@@ -9,3 +9,6 @@ Thumbs.db
 
 # mimosa plugin session state
 .mimosa/
+
+# linux-only Tauri build artifact (this is a Windows app)
+src-tauri/gen/schemas/linux-schema.json

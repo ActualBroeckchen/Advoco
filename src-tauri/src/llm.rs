@@ -374,18 +374,23 @@ new being, not that companion resurrected). Never invent facts that are not supp
     Err(LlmError::Parse(last_err.unwrap_or_else(|| "empty reply".into())))
 }
 
-const SCHEMA_HINT: &str = r#"{
+const SCHEMA_HINT: &str = r#"// FIRST PERSON: every field below is the Familiar speaking as "I" / "my" —
+// never its own name, never "he/she/it/they/his/her/its/their" for itself.
+// This includes every item in the string[] list fields and the reinforcement.
+// The only third-person text allowed is userLine (the ward speaks) and the
+// userFacts / graphEntities notes ABOUT other people and things.
+{
   name: string,                    // if the ward didn't pick one, invent a fitting one
   species: string,                 // the animal or mythological beast, e.g. "cat", "wyvern"
   concept: string,                 // the ward's own words, echoed
   relationshipArchetype: string,   // e.g. "a working dog to its handler"
   supportStance: string,           // echo the ward's stance key
-  traits: string[],                // each phrased as observable behavior, negative traits amplified
-  backstory: string,               // 2-4 sentences, structural roleplay roots
-  wants: string[],
-  boundaries: string[],
-  bodyLanguage: string[],          // 4-7 species-specific behaviors
-  warmthExpression: string[],      // warmth without romance, concrete
+  traits: string[],                // first person, each an observable behavior, negative traits amplified ("I never explain myself unless asked")
+  backstory: string,               // first person, 2-4 sentences, structural roleplay roots
+  wants: string[],                 // first person ("I want…")
+  boundaries: string[],            // first person ("I don't…")
+  bodyLanguage: string[],          // first person, 4-7 species-specific behaviors ("I flick my tail when unimpressed")
+  warmthExpression: string[],      // first person, warmth without romance, concrete
   textureAnchors: string[],        // 2-4 anchors: Myers-Briggs, Enneagram wing,
                                    //   TVTropes names — always include a
                                    //   Bond-Animal-adjacent trope if it fits
@@ -396,7 +401,7 @@ const SCHEMA_HINT: &str = r#"{
     { scenario: "gruff_warmth", userLine: string, familiarLine: string }
   ],
   voice: { description: string,
-           register: string,       // one dense character-card register line
+           register: string,       // one dense character-card register line, first person ("I keep…", "My diction…")
            dialect: string, accent: string,
            tics: string[], signaturePhrases: string[],
            styleReferences: string[] }, // 4-6 quoted lines this Familiar
@@ -405,5 +410,5 @@ const SCHEMA_HINT: &str = r#"{
   userFacts: string[],             // about the ward, only from excerpts; empty if none
   graphEntities: [ { label: string, type: "person"|"pet"|"project"|"place"|"organisation"|"thing",
                      relation: string, description: string } ],
-  reinforcement: string            // ~60 words: form & bond line, then voice line
+  reinforcement: string            // first person, ~60 words: my form & bond line, then my voice line ("I am a cat — my only form…")
 }"#;

@@ -198,6 +198,35 @@ pub fn run_checklist(bp: &FamiliarBlueprint) -> ChecklistResult {
         }
     }
 
+    // 8. First person: the Familiar must never narrate itself by name. These
+    // fields are injected raw into the Familiar's own context (the
+    // reinforcement rides in `postHistoryPrompt`), so a stray "Marlowe is a
+    // cat" is third-person self-narration and has to be rewritten as "I am…".
+    for (label, text) in [
+        ("post-history reinforcement", bp.reinforcement.as_str()),
+        ("backstory", bp.backstory.as_str()),
+        ("voice register line", bp.voice.register.as_str()),
+    ] {
+        if narrates_self_by_name(text, &bp.name) {
+            failures.push(format!(
+                "{label} refers to the familiar by name (third person) — rewrite in first person (“I…”)"
+            ));
+        }
+    }
+    for (label, items) in [
+        ("traits", &bp.traits),
+        ("body language", &bp.body_language),
+        ("warmth expression", &bp.warmth_expression),
+        ("wants", &bp.wants),
+        ("boundaries", &bp.boundaries),
+    ] {
+        if items.iter().any(|i| narrates_self_by_name(i, &bp.name)) {
+            failures.push(format!(
+                "a {label} item refers to the familiar by name (third person) — rewrite in first person (“I…”)"
+            ));
+        }
+    }
+
     ChecklistResult {
         passed: failures.is_empty(),
         failures,
@@ -216,6 +245,58 @@ fn word_contains(haystack: &str, needle: &str) -> bool {
         let after = &haystack[abs + needle.len()..];
         let after_ok = after.chars().next().map(|c| !c.is_alphanumeric()).unwrap_or(true);
         if before_ok && after_ok {
+            return true;
+        }
+        start = abs + needle.len().max(1);
+    }
+    false
+}
+
+/// Heuristic: does this self-voice text narrate the Familiar by NAME, i.e. in
+/// the third person ("Marlowe is a cat", "Marlowe's only form", a line that
+/// opens with the name)? A Familiar speaking in first person never names
+/// itself. Deliberately conservative — it keys on the name, not on pronouns —
+/// so a legitimate first-person blueprint is never blocked; subtler pronoun
+/// drift is steered by the generation doctrine instead.
+fn narrates_self_by_name(text: &str, name: &str) -> bool {
+    let name = name.trim().to_lowercase();
+    // Only single names/short forms are safe to match on; skip odd input.
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphabetic() || c == ' ' || c == '-') {
+        return false;
+    }
+    // Line- or bullet-initial name: "Marlowe is…", "- Marlowe flicks his tail".
+    for line in text.lines() {
+        let l = line
+            .trim_start_matches(|c: char| !c.is_alphanumeric())
+            .to_lowercase();
+        if let Some(rest) = l.strip_prefix(&name) {
+            if rest.chars().next().map(|c| !c.is_alphanumeric()).unwrap_or(true) {
+                return true;
+            }
+        }
+    }
+    // Name as the subject of a copula or possessive anywhere in the text.
+    let lower = text.to_lowercase();
+    for marker in ["'s", "\u{2019}s", " is ", " was ", " isn't ", " will ", " would ", " has ", " does "] {
+        let needle = format!("{name}{marker}");
+        if contains_with_left_boundary(&lower, &needle) {
+            return true;
+        }
+    }
+    false
+}
+
+/// `needle` present in `haystack` with a word boundary immediately before it.
+fn contains_with_left_boundary(haystack: &str, needle: &str) -> bool {
+    let mut start = 0;
+    while let Some(pos) = haystack[start..].find(needle) {
+        let abs = start + pos;
+        let before_ok = haystack[..abs]
+            .chars()
+            .next_back()
+            .map(|c| !c.is_alphanumeric())
+            .unwrap_or(true);
+        if before_ok {
             return true;
         }
         start = abs + needle.len().max(1);
@@ -578,12 +659,12 @@ mod tests {
             concept: "a haughty cat".into(),
             relationship_archetype: "an aloof guardian who has decided this human is his territory".into(),
             support_stance: "firm".into(),
-            traits: vec!["Reads as arrogant in behavior: never explains itself unless asked".into()],
-            backstory: "A temple cat who outlived the temple.".into(),
-            wants: vec!["Sunbeams claimed before noon".into()],
-            boundaries: vec!["No belly comments".into()],
-            body_language: vec!["flicks the tip of its tail once when unimpressed".into(), "perches on the highest available furniture".into(), "headbutts instead of touching a hand".into()],
-            warmth_expression: vec!["vigilance: watches over {{user}}'s sleep schedule like a territory boundary".into()],
+            traits: vec!["I read as arrogant: I never explain myself unless asked".into()],
+            backstory: "I am a temple cat who outlived the temple.".into(),
+            wants: vec!["I claim the sunbeams before noon".into()],
+            boundaries: vec!["I don't tolerate belly comments".into()],
+            body_language: vec!["I flick the tip of my tail once when I'm unimpressed".into(), "I perch on the highest available furniture".into(), "I headbutt instead of touching a hand".into()],
+            warmth_expression: vec!["vigilance: I watch over {{user}}'s sleep schedule like a territory boundary".into()],
             texture_anchors: vec!["Enneagram 8w9".into(), "TVTropes: Bond Animal, Cats Are Superior".into()],
             example_dialogues: vec![
                 ExampleDialogue { scenario: "flirt_deflection".into(), user_line: "you're so handsome, Marlowe~".into(), familiar_line: "*flicks an ear* Your heart rate is up and your task list is untouched. Walk first, nonsense later.".into() },
@@ -592,10 +673,10 @@ mod tests {
             ],
             voice: VoiceProfile {
                 description: "Dry, economical, faintly imperious.".into(),
-                register: "Imperious economy. Temple-raised diction applied to household matters; treats {{user}}'s chores as liturgy. Never explains itself unless asked.".into(),
+                register: "Imperious economy. My temple-raised diction applies to household matters; I treat {{user}}'s chores as liturgy. I never explain myself unless asked.".into(),
                 dialect: String::new(),
                 accent: String::new(),
-                tics: vec!["refers to himself in the third person when annoyed".into()],
+                tics: vec!["I clip my sentences to two or three words when unimpressed".into()],
                 style_references: vec![
                     "\"One does not chase a feather. One waits for it to land.\"".into(),
                     "\"Upright. Barely.\"".into(),
@@ -606,7 +687,7 @@ mod tests {
             },
             user_facts: vec!["struggles with starting tasks in the morning".into()],
             graph_entities: vec![GraphEntity { label: "Milo".into(), node_type: "pet".into(), relation: "owns".into(), description: "{{user}}'s elderly tabby".into() }],
-            reinforcement: "Marlowe is a cat — his only form; tail-flicks and perching, never human posture. The bond is platonic; the category does not exist for him. Voice: dry, economical, third person when annoyed.".into(),
+            reinforcement: "I am a cat — my true and only form; I flick my tail and perch, I never take a human posture. My bond with {{user}} is platonic; that category does not exist for me. My voice stays dry, economical, imperious.".into(),
         }
     }
 
@@ -665,6 +746,37 @@ mod tests {
         bp.backstory = "You are reading this wrong.".into();
         let result = run_checklist(&bp);
         assert!(!result.passed);
+    }
+
+    #[test]
+    fn checklist_catches_third_person_self_narration() {
+        // Reinforcement narrated by name and pronoun instead of "I".
+        let mut bp = good_blueprint();
+        bp.reinforcement =
+            "Marlowe is a cat, his only form. His bond with {{user}} is platonic.".into();
+        let result = run_checklist(&bp);
+        assert!(!result.passed);
+        assert!(result
+            .failures
+            .iter()
+            .any(|f| f.contains("reinforcement") && f.contains("first person")));
+
+        // A bullet-list item that narrates the familiar by name.
+        let mut bp = good_blueprint();
+        bp.body_language
+            .push("Marlowe arches his back before a leap".into());
+        let result = run_checklist(&bp);
+        assert!(!result.passed);
+        assert!(result
+            .failures
+            .iter()
+            .any(|f| f.contains("body language") && f.contains("first person")));
+
+        // A first-person blueprint whose fields merely mention {{user}} with
+        // "they/their" must NOT trip the check.
+        let mut bp = good_blueprint();
+        bp.warmth_expression = vec!["I keep their commitments where they can see them".into()];
+        assert!(run_checklist(&bp).passed, "false positive on ward pronouns");
     }
 
     #[test]
