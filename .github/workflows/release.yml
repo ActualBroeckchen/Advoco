@@ -1,12 +1,28 @@
 name: Release
 
-# Build the Windows installer and publish it to a GitHub Release whenever a
-# version tag (e.g. v0.2.0) is pushed. Advoco is a Tauri app whose only bundle
-# target is the NSIS installer, so the build must run on Windows.
+# Build the Windows installer and publish it to a GitHub Release.
+#
+# Triggers two ways:
+#   * push of a version tag (e.g. v0.2.0) — the normal path for a new release;
+#   * manual "Run workflow" (workflow_dispatch) with a tag input — lets you
+#     (re)build the installer for an EXISTING release without re-tagging, which
+#     is what you need when a tag was already cut before this workflow worked.
+#     A tag-triggered run reads the workflow file baked into the tag's commit,
+#     so an older tag can't pick up a fix here; the manual button runs THIS
+#     (fixed) file from the default branch and uploads to the named release.
+#
+# Advoco is a Tauri app whose only bundle target is the NSIS installer, so the
+# build must run on Windows.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build the installer for and attach it to (e.g. v0.2.0)"
+        required: true
+        default: "v0.2.0"
 
 permissions:
   contents: write # tauri-action needs this to create the release and upload assets
@@ -15,8 +31,12 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
+      # Build the exact commit the release tag points at (on a manual run too),
+      # so the installer matches the released source.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -28,15 +48,21 @@ jobs:
 
       # The UI is plain HTML/CSS/JS embedded at compile time (no JS build step),
       # so there is nothing to install or build before Tauri runs.
+      #
+      # Pinned to v0.5.24: the v0.6.x line and the floating @v0 tag ship an
+      # action.yml that runs on node24, which GitHub-hosted runners do not yet
+      # support — that makes the job fail at startup before any step runs.
+      # v0.5.24 is the newest release still on node20. Revisit once the runners
+      # ship a node24 action runtime.
       - name: Build installer and publish release
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v0.5.24
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Advoco ${{ github.ref_name }}"
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "Advoco ${{ inputs.tag || github.ref_name }}"
           releaseBody: |
-            Windows installer for Advoco ${{ github.ref_name }}.
+            Windows installer for Advoco ${{ inputs.tag || github.ref_name }}.
 
             Grab `Advoco_*_x64-setup.exe` below, run it, and start Advoco from
             your Start menu. See the README for what's new.
